@@ -16,6 +16,14 @@ analyses_v3/data/*.npz
 analyses_v3/data/*.json
 analyses_v3/logs/
 
+# Whitelisted summary outputs that directly back paper numbers
+!analyses_v3/data/per_gene_lot_drift.json
+!analyses_v3/data/common_cause_mechanism.json
+!analyses_v3/data/k_sweep.json
+!analyses_v3/data/calibration_error_misclass.json
+!analyses_v3/data/deployment_ammo.json
+!analyses_v3/data/misclassification_sim.json
+
 # Model coefficient matrices — DO NOT publish
 # Both the deployed Chen 2023 ensemble coefficients AND any reproduced ones
 data/raleigh75_coef_matrix.csv

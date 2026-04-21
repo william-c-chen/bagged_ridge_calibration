@@ -29,6 +29,12 @@ sweep `42 + 100m` for `m = 1..100`.
 | `05_score_bagging_multiseed.py` | Score the 100 reproduced β̄'s on bridging samples; compute LOO-CV K=6/K=3, cross-experiment \|Δslope\|/\|Δintercept\|, probe-failure. | `data/glmnet_ffpe_multiseed_scoring.json` |
 | `06_single_models_multiseed.py` | Fit single ridge, LASSO, elastic net (each at 100 CV-fold seeds) and deterministic OLS on the FFPE training set; score and metric on bridging. | `data/single_models_multiseed.json` |
 | `07_make_tables.py`             | Aggregate medians (Table 7) and SDs (Table 8) from the multi-seed outputs. | `data/table7_headline_metrics.csv`, `table8_seed_variance.csv` |
+| `08_per_gene_lot_drift.py`      | §3.4 per-gene lot-drift magnitude across all 9 lot pairs; identifies most/least lot-responsive genes and score-impact concentration. | `data/per_gene_lot_drift.json` |
+| `09_common_cause_mechanism.py`  | §3.4 mechanism test: within-training expression SD as common cause of lot drift and ridge shrinkage ($r = +0.24$ and $-0.62$). | `data/common_cause_mechanism.json` |
+| `10_misclassification_sim.py`   | Seed-variability misclassification scenario (superseded by script 12 for the paper's primary framing). | `data/misclassification_sim.json` |
+| `11_k_sweep.py`                 | Bridging-panel size sweep: LOO-CV RMSE vs K for each architecture across 100 seeds. | `data/k_sweep.json` |
+| `12_calibration_error_misclass.py` | §3.6 primary clinical-translation: closed-form expected misclassification rate at thresholds, per architecture and K. | `data/calibration_error_misclass.json` |
+| `13_deployment_ammo.py`         | §3.6 stressor sensitivity (3$\times$ drift) and analyst range (P10-P90) supporting tables. | `data/deployment_ammo.json` |
 
 ## Headline numbers
 
@@ -68,11 +74,13 @@ SD across 100 random seeds (lower = less reliance on lucky CV-fold draws):
 ## Directory layout
 
 ```
-analyses/
-  scripts/                      Canonical reproducible pipeline (numbered 00-07)
+analyses_v3/
+  scripts/                      Canonical reproducible pipeline (00-07 main; 08-13 extensions for §3.4 and §3.6)
     common.py                   Shared constants, paths, normalization helpers
-    _deprecated/                Earlier exploratory scripts kept for audit trail
   data/                         Intermediate outputs (NPZ, JSON, CSV)
+                                The six JSON files that back paper numbers are
+                                committed (whitelisted in .gitignore); coefficient
+                                matrices are not redistributed.
   figures/                      Reserved for plot outputs
   logs/                         stdout capture per script
   run_all.sh                    Single-command full pipeline

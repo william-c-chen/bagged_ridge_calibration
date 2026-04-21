@@ -1,0 +1,8 @@
+{
+  "r_train_sd_vs_drift": 0.24375093630421552,
+  "r_train_sd_vs_beta": -0.6241212661108485,
+  "r_drift_vs_beta": -0.2520440128121129,
+  "r_corXY_vs_beta": 0.27372996704721286,
+  "r_bootCV_vs_drift": -0.08738562271877379,
+  "r_bootCV_vs_train_sd": 0.158902367311069
+}
