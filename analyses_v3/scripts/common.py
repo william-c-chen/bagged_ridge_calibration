@@ -110,3 +110,58 @@ def hk_normalize(counts_row: np.ndarray, hk_row: np.ndarray) -> np.ndarray:
 def ensure_dirs():
     for d in (DATA_DIR, FIG_DIR, LOG_DIR):
         os.makedirs(d, exist_ok=True)
+
+
+# ==================== Calibration metrics (matching paper conventions) ====================
+# These match the protocols in scripts/02_leave_one_out_cv.py and 04_ridge_vs_sparsified.py
+# of the bagged_ridge_calibration repo (Tables 1, 2, 6 of the paper).
+
+OTHER_LOTS_2026 = ['B', 'D', 'E']  # for "predict mean(B,D,E) from A" LOO-CV protocol
+
+
+def loocv_amean_k6(scores, samples, lots_target=OTHER_LOTS_2026):
+    """K=6 LOO-CV linear-correction RMSE, paper protocol:
+    target = mean of scores on `lots_target`; predictor = score on lot A.
+    Fit linear correction on K-1 samples, predict K-th, iterate, return RMSE."""
+    import numpy as np
+    from scipy import stats
+    yA = np.array([scores[(s, 'A')] for s in samples])
+    yT = np.array([np.mean([scores[(s, L)] for L in lots_target]) for s in samples])
+    errs = []
+    for i in range(len(samples)):
+        m = np.ones(len(samples), dtype=bool); m[i] = False
+        sl, ic, *_ = stats.linregress(yA[m], yT[m])
+        errs.append(yT[i] - (sl * yA[i] + ic))
+    return float(np.sqrt(np.mean(np.array(errs)**2)))
+
+
+def loocv_amean_k3(scores, samples, lots_target=OTHER_LOTS_2026):
+    """K=3 enumeration: all C(N,3) 3-sample training subsets, paper protocol."""
+    import numpy as np
+    from scipy import stats
+    from itertools import combinations
+    yA = np.array([scores[(s, 'A')] for s in samples])
+    yT = np.array([np.mean([scores[(s, L)] for L in lots_target]) for s in samples])
+    all_errs = []
+    for train in combinations(range(len(samples)), 3):
+        train_idx = list(train)
+        test_idx = [i for i in range(len(samples)) if i not in train_idx]
+        yA_tr = yA[train_idx]; yT_tr = yT[train_idx]
+        if np.var(yA_tr) < 1e-12: continue
+        sl, ic, *_ = stats.linregress(yA_tr, yT_tr)
+        for i in test_idx:
+            all_errs.append(yT[i] - (sl * yA[i] + ic))
+    return float(np.sqrt(np.mean(np.array(all_errs)**2)))
+
+
+def probe_failure_paper(beta, X_norm_lotA_per_sample):
+    """Worst-gene probe-failure sensitivity, paper protocol:
+    For each gene g and sample s: shift = |β_g × X_norm_lotA(s)[g]|
+    Returns max over all (g, s)."""
+    import numpy as np
+    worst = 0.0
+    for g in range(len(beta)):
+        for s_vec in X_norm_lotA_per_sample:
+            val = abs(beta[g] * s_vec[g])
+            if val > worst: worst = val
+    return float(worst)

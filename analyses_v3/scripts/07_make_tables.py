@@ -1,81 +1,31 @@
 """Build Tables 7 and 8 from the multi-seed scoring outputs.
 
+Uses the paper-protocol metrics: LOO-CV target = mean(B,D,E) from A; probe
+failure = max_{g,s} |β_g × X_norm(s, lot A)[g]|. See common.py.
+
 Reads:
   data/glmnet_ffpe_multiseed_scoring.json   (from 05_score_bagging_multiseed.py)
   data/single_models_multiseed.json         (from 06_single_models_multiseed.py)
   data/deployed_ensemble_true.npz           (optional; from 00_load_deployed_coefs.py)
-  data/bridging_normalized.npz               (from 03_parse_rcc_bridging.py)
 
 Writes:
   data/table7_headline_metrics.csv
   data/table8_seed_variance.csv
-
-Both tables are also printed to stdout (latex-ready rows).
 """
-import os, sys, json, csv, itertools
+import os, sys, json, csv
 sys.path.insert(0, os.path.dirname(__file__))
 import numpy as np
-from common import DATA_DIR, BRIDGING_SAMPLES_2026, BRIDGING_SAMPLES_2023_ALL
-
-BRIDGING_SAMPLES_2023_PAPER = [s for s in BRIDGING_SAMPLES_2023_ALL if s != 'MEN-315']
+from common import DATA_DIR
 
 # ---- Load multi-seed outputs ----
 with open(os.path.join(DATA_DIR, 'glmnet_ffpe_multiseed_scoring.json')) as f:
-    bagged = json.load(f)['per_seed']
+    bag_data = json.load(f)
+bagged = bag_data['per_seed']
+deployed_metrics = bag_data.get('deployed', None)
+have_deployed = deployed_metrics is not None
+
 with open(os.path.join(DATA_DIR, 'single_models_multiseed.json')) as f:
     single = json.load(f)
-
-# Deployed metrics
-deployed_path = os.path.join(DATA_DIR, 'deployed_ensemble_true.npz')
-have_deployed = os.path.exists(deployed_path)
-if have_deployed:
-    dep = np.load(deployed_path, allow_pickle=True)
-    dep_beta, dep_intc = dep['beta'], float(dep['intercept'])
-    br = np.load(os.path.join(DATA_DIR, 'bridging_normalized.npz'), allow_pickle=True)
-    keys_26 = [tuple(k) for k in br['keys_2026']]
-    keys_23 = [tuple(k) for k in br['keys_2023']]
-
-    def fit_panel(store, samples, la, lb):
-        xa = np.array([store[(s, la)] for s in samples])
-        yb = np.array([store[(s, lb)] for s in samples])
-        c, *_ = np.linalg.lstsq(np.column_stack([xa, np.ones_like(xa)]), yb, rcond=None)
-        return float(c[0]), float(c[1])
-
-    def loocv_k6(store, samples, la, lb):
-        errs = []
-        for hold in samples:
-            trs = [s for s in samples if s != hold]
-            xa = np.array([store[(s, la)] for s in trs]); yb = np.array([store[(s, lb)] for s in trs])
-            c, *_ = np.linalg.lstsq(np.column_stack([xa, np.ones_like(xa)]), yb, rcond=None)
-            errs.append(c[0]*store[(hold, la)] + c[1] - store[(hold, lb)])
-        return float(np.sqrt(np.mean(np.array(errs)**2)))
-
-    def loocv_k3(store, samples, la, lb):
-        all_errs = []
-        for trs in itertools.combinations(samples, 3):
-            test = [s for s in samples if s not in trs]
-            xa = np.array([store[(s, la)] for s in trs]); yb = np.array([store[(s, lb)] for s in trs])
-            c, *_ = np.linalg.lstsq(np.column_stack([xa, np.ones_like(xa)]), yb, rcond=None)
-            for s in test:
-                all_errs.append(c[0]*store[(s, la)] + c[1] - store[(s, lb)])
-        return float(np.sqrt(np.mean(np.array(all_errs)**2)))
-
-    def probe_failure(coef, X_raw):
-        return float(np.max(np.abs(-coef[None, :] * np.log2(X_raw + 1))))
-
-    s26 = dict(zip(keys_26, dep_intc + br['X_norm_2026'] @ dep_beta))
-    s23 = dict(zip(keys_23, dep_intc + br['X_norm_2023'] @ dep_beta))
-    a23, b23 = fit_panel(s23, BRIDGING_SAMPLES_2023_PAPER, 'A', 'B')
-    a26, b26 = fit_panel(s26, BRIDGING_SAMPLES_2026, 'A', 'B')
-    deployed_metrics = {
-        'L2': float(np.linalg.norm(dep_beta)), 'cos_dep': 1.0,
-        'LOO_K6': loocv_k6(s26, BRIDGING_SAMPLES_2026, 'A', 'B'),
-        'LOO_K3': loocv_k3(s26, BRIDGING_SAMPLES_2026, 'A', 'B'),
-        'dslope': abs(a23 - a26), 'dintc': abs(b23 - b26),
-        'probe_failure': probe_failure(dep_beta, br['X_raw_2026']),
-    }
-else:
-    deployed_metrics = None
 
 # ---- Table 7: headline medians ----
 def median_metrics(runs):
