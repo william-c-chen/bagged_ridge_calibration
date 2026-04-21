@@ -74,6 +74,22 @@ Scripts marked "Public" reproduce fully from the public CSVs in this repository.
 | `r = 0.65` for ‖β‖₂ vs LOO-CV RMSE; `r = 0.33` for directional quantity (Table 5) | `03_coefficient_correlations.py` | Coefficient |
 | 2.6× probe-failure protection vs 5-gene sparsified alternative (Table 4) | `04_ridge_vs_sparsified.py` | Coefficient |
 
+## Independent reproduction of the bagging procedure (Tables 7 + 8 in v3)
+
+`analyses_v3/` contains a fully reproducible end-to-end pipeline that:
+
+1. Builds the 64-sample paired-FFPE training set (X = log₂ housekeeping-normalized counts; y = the LASSO-Cox-derived risk score from Chen et al. 2023);
+2. Runs the published 500-bootstrap glmnet bagging procedure (`cv.glmnet` with `λ_{1se}` per bootstrap) at **100 independent random seeds**;
+3. Fits **single-model alternatives** — ridge, LASSO, elastic net, OLS — on the same training data, also at 100 random CV-fold seeds;
+4. Scores all reproductions on the same 2023/2026 bridging samples and emits Tables 7 (headline medians) and 8 (per-seed standard deviations).
+
+```bash
+cd analyses_v3
+bash run_all.sh
+```
+
+Total runtime ≈ 25 minutes (dominated by the 100-seed glmnet bagging). Outputs include `data/table7_headline_metrics.csv` and `data/table8_seed_variance.csv`. Per-seed individual coefficient matrices are intentionally not redistributed (see `.gitignore`); only the resulting metric distributions are.
+
 ## Citing
 
 If you use this code or data, please cite the paper (see above) and the underlying biomarker publication:
